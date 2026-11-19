@@ -18,6 +18,15 @@ jobs:
   build:
     name: build ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
+    # Each leg builds natively (x86_64 on x86_64, aarch64 on arm), so the
+    # musl-gcc wrapper from musl-tools is a compiler for the right target.
+    # Without it ring's build script cannot find a C compiler and fails with
+    # "failed to find tool \"aarch64-linux-musl-gcc\"".
+    env:
+      CC_x86_64_unknown_linux_musl: musl-gcc
+      AR_x86_64_unknown_linux_musl: ar
+      CC_aarch64_unknown_linux_musl: musl-gcc
+      AR_aarch64_unknown_linux_musl: ar
     strategy:
       fail-fast: false
       matrix:
@@ -34,6 +43,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install musl toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          musl-gcc --version | head -n1
 
       - uses: Swatinem/rust-cache@v2
         with:
