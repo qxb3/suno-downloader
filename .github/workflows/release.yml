@@ -13,6 +13,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Maintainer shown in the generated .deb/.rpm packages. Change the RPM
+  # License field in the packaging step if the project is not proprietary.
+  PACKAGE_MAINTAINER: "qxb3 <qxb3@users.noreply.github.com>"
 
 jobs:
   build:
@@ -47,7 +50,7 @@ jobs:
       - name: Install musl toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
+          sudo apt-get install -y musl-tools rpm
           musl-gcc --version | head -n1
 
       - uses: Swatinem/rust-cache@v2
@@ -85,10 +88,75 @@ jobs:
           (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
           ls -l dist
 
+      - name: Build distro packages
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          bin="target/${{ matrix.target }}/release/suno-downloader"
+          homepage="https://github.com/${{ github.repository }}"
+          mkdir -p dist
+
+          # .deb — Debian, Ubuntu, Mint, Pop!_OS, Kali, Raspberry Pi OS, ...
+          deb_arch=$(dpkg --print-architecture)
+          deb_root="pkg/deb/${deb_arch}"
+          rm -rf "$deb_root"
+          install -Dm755 "$bin" "$deb_root/usr/bin/suno-downloader"
+          install -Dm644 README.md "$deb_root/usr/share/doc/suno-downloader/README.md"
+          mkdir -p "$deb_root/DEBIAN"
+          cat > "$deb_root/DEBIAN/control" <<EOF
+          Package: suno-downloader
+          Version: $version
+          Architecture: $deb_arch
+          Maintainer: $PACKAGE_MAINTAINER
+          Depends: ffmpeg
+          Section: sound
+          Priority: optional
+          Homepage: $homepage
+          Description: download a Suno song as an MP3
+           Turns a suno.com song link into a tagged MP3 file. The audio is
+           fetched, decrypted and encoded with ffmpeg, without an account.
+          EOF
+          dpkg-deb --build --root-owner-group "$deb_root" \
+            "dist/suno-downloader_${version}_${deb_arch}.deb"
+
+          # .rpm — Fedora, RHEL, Rocky, Alma, CentOS Stream, openSUSE, Amazon Linux
+          topdir="$PWD/pkg/rpm"
+          rm -rf "$topdir"
+          mkdir -p "$topdir"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          cp "$bin" "$topdir/SOURCES/suno-downloader"
+          cp README.md "$topdir/SOURCES/README.md"
+          cat > "$topdir/SPECS/suno-downloader.spec" <<EOF
+          %define debug_package %{nil}
+          Name: suno-downloader
+          Version: $version
+          Release: 1
+          Summary: Download a Suno song as an MP3
+          License: Proprietary
+          URL: $homepage
+          # File-based dependency: satisfied by Fedora's ffmpeg-free, RPM Fusion's
+          # ffmpeg, or openSUSE's Packman build, whichever is installed.
+          Requires: /usr/bin/ffmpeg
+          %description
+          Turns a suno.com song link into a tagged MP3 file. The audio is
+          fetched, decrypted and encoded with ffmpeg, without an account.
+          %install
+          install -Dm755 %{_sourcedir}/suno-downloader %{buildroot}%{_bindir}/suno-downloader
+          install -Dm644 %{_sourcedir}/README.md %{buildroot}%{_docdir}/%{name}/README.md
+          %files
+          %{_bindir}/suno-downloader
+          %{_docdir}/%{name}/README.md
+          EOF
+          rpmbuild -bb --define "_topdir $topdir" "$topdir/SPECS/suno-downloader.spec"
+          cp "$topdir"/RPMS/*/*.rpm dist/
+
+          (cd dist && sha256sum suno-downloader_*.deb suno-downloader-*.rpm \
+            > "packages-${{ matrix.target }}.sha256")
+          ls -l dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: suno-downloader-${{ matrix.target }}
-          path: dist/*.tar.gz*
+          path: dist/*
           if-no-files-found: error
 
   release:
@@ -123,13 +191,28 @@ jobs:
           - `aarch64-unknown-linux-musl` — ARM64 machines, Raspberry Pi 4/5 (64-bit)
 
           Each tarball contains the `suno-downloader` binary and this README.
-          Verify with `sha256sum --check <file>.sha256`.
+
+          Native packages are provided for the major distributions:
+
+          - `suno-downloader_<version>_amd64.deb` / `..._arm64.deb` —
+            Debian, Ubuntu, Mint, Pop!_OS, Kali, Raspberry Pi OS
+          - `suno-downloader-<version>-1.x86_64.rpm` / `...aarch64.rpm` —
+            Fedora, RHEL/Rocky/Alma, CentOS Stream, openSUSE, Amazon Linux
+
+          Verify all downloads with `sha256sum --check <file>.sha256` (tarballs)
+          or `packages-<target>.sha256` (packages).
 
           Requirements: **ffmpeg** on `PATH` (for MP3 encoding).
 
           ```bash
+          # Any distribution, from the tarball:
           tar -xzf suno-downloader-*-x86_64-unknown-linux-musl.tar.gz
           sudo install suno-downloader-*/suno-downloader /usr/local/bin/
+
+          # or, from a package:
+          sudo apt install ./suno-downloader_*.deb        # Debian/Ubuntu
+          sudo dnf install ./suno-downloader-*.rpm        # Fedora/RHEL
+
           suno-downloader https://suno.com/song/<id>
           ```
           EOF
@@ -138,6 +221,6 @@ jobs:
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
             gh release create "$GITHUB_REF_NAME" dist/* \
-              --title "suno-downloader ${GITHUB_REF_NAME#v}" \
+              --title "$GITHUB_REF_NAME" \
               --notes-file notes.md
           fi

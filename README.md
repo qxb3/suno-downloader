@@ -39,11 +39,22 @@ video's AAC track if the encrypted stream is unavailable.
 
 ## Install
 
+Prebuilt static binaries, plus `.deb` and `.rpm` packages, are attached to
+each [release](https://github.com/qxb3/suno-downloader/releases):
+
+```bash
+sudo apt install ./suno-downloader_*.deb    # Debian, Ubuntu, Mint, Pop!_OS, Kali
+sudo dnf install ./suno-downloader-*.rpm    # Fedora, RHEL/Rocky/Alma, openSUSE
+```
+
+Or build from source:
+
 ```bash
 cargo install --path .
 ```
 
-Requires **ffmpeg** on `PATH` (`apt install ffmpeg`, `brew install ffmpeg`, …).
+Requires **ffmpeg** on `PATH` (`apt install ffmpeg`, `brew install ffmpeg`, …);
+the packages declare it as a dependency.
 
 ## Usage
 
