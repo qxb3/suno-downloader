@@ -3,9 +3,7 @@
 Download a Suno song as an MP3 from a link:
 
 ```bash
-suno-downloader https://suno.com/song/36609702-93ee-467d-b011-b6b6554ed492
-# ♪ Our Friendship Never Will — toolong972
-# Saved toolong972 - Our Friendship Never Will.mp3 (9.2 MB · 5:05)
+suno-downloader <suno song link>
 ```
 
 No account or cookie is needed, including for private (unlisted) songs.
