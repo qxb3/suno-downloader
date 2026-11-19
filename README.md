@@ -8,6 +8,10 @@ suno-downloader <suno song link>
 
 No account or cookie is needed, including for private (unlisted) songs.
 
+There is a browser version too: the [Tampermonkey userscript](#browser-tampermonkey)
+puts a download button straight on suno.com — same endpoints, no ffmpeg and no
+terminal.
+
 ## How it works
 
 This reproduces the flow used by the downloader at
@@ -92,6 +96,29 @@ cargo install --path .
 ```
 
 Verify downloads with `sha256sum --check <file>.sha256`.
+
+## Browser (Tampermonkey)
+
+Prefer not to install a CLI? [`tampermonkey/`](./tampermonkey) is a userscript
+that replaces the share button on [suno.com](https://suno.com) with a download
+button:
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) (or Violentmonkey).
+2. Open [`tampermonkey/suno-downloader.user.js`](./tampermonkey/suno-downloader.user.js)
+   and let the extension install it, or paste it into a new script.
+3. Open a song or playlist on suno.com and press the download button where the
+   share button used to be.
+
+It walks the same steps described above — clip metadata, the rights endpoint,
+AES-GCM unwrap, AES-CTR decryption — but finishes in the browser: the Opus
+stream is decoded with `AudioContext` and encoded to 256 kbps MP3 by lamejs,
+split over one Web Worker per core (a 6-minute song takes seconds on a modern
+machine), then tagged with ID3v2.3 (title, artist, album, genre, year, song URL)
+and the cover art. Chrome or Chromium is recommended; browsers that cannot
+decode Opus in MP4 (Firefox in practice) save the decrypted `.m4a` instead.
+
+See [`tampermonkey/README.md`](./tampermonkey/README.md) for details,
+differences from the CLI, and troubleshooting.
 
 ## Usage
 
