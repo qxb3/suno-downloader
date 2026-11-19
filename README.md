@@ -39,22 +39,59 @@ video's AAC track if the encrypted stream is unavailable.
 
 ## Install
 
-Prebuilt static binaries, plus `.deb` and `.rpm` packages, are attached to
-each [release](https://github.com/qxb3/suno-downloader/releases):
+Prebuilt static binaries and native packages are attached to each
+[release](https://github.com/qxb3/suno-downloader/releases). All of them need
+**ffmpeg** on `PATH` (`apt install ffmpeg`, `dnf install ffmpeg-free`,
+`pacman -S ffmpeg`, `brew install ffmpeg`, …); the packages declare it as a
+dependency.
+
+**Debian, Ubuntu, Mint, Pop!_OS, Kali, Raspberry Pi OS** — `amd64` or `arm64`:
 
 ```bash
-sudo apt install ./suno-downloader_*.deb    # Debian, Ubuntu, Mint, Pop!_OS, Kali
-sudo dnf install ./suno-downloader-*.rpm    # Fedora, RHEL/Rocky/Alma, openSUSE
+sudo apt install ./suno-downloader_*.deb
 ```
 
-Or build from source:
+**Fedora, RHEL, Rocky, Alma, CentOS Stream** — `x86_64` or `aarch64`:
+
+```bash
+sudo dnf install ./suno-downloader-*.rpm
+```
+
+On Fedora, ffmpeg comes from `ffmpeg-free` or RPM Fusion; RHEL needs RPM Fusion.
+The package depends on `/usr/bin/ffmpeg`, so whichever build is installed
+satisfies it.
+
+**openSUSE** — `x86_64` or `aarch64`:
+
+```bash
+sudo zypper install ./suno-downloader-*.rpm
+```
+
+ffmpeg on openSUSE comes from [Packman](https://packman.links2linux.org/).
+
+**Arch Linux, Arch Linux ARM, Manjaro, EndeavourOS, CachyOS** — download
+`PKGBUILD` from the release, then:
+
+```bash
+makepkg -si
+```
+
+**Any other distribution** — the static tarball runs anywhere (musl,
+static-pie, no glibc requirement):
+
+```bash
+# x86_64; use the aarch64 tarball for ARM64
+tar -xzf suno-downloader-*-x86_64-unknown-linux-musl.tar.gz
+sudo install suno-downloader-*/suno-downloader /usr/local/bin/
+```
+
+**From source**:
 
 ```bash
 cargo install --path .
 ```
 
-Requires **ffmpeg** on `PATH` (`apt install ffmpeg`, `brew install ffmpeg`, …);
-the packages declare it as a dependency.
+Verify downloads with `sha256sum --check <file>.sha256`.
 
 ## Usage
 

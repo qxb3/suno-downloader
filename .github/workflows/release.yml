@@ -177,50 +177,60 @@ jobs:
           sha256sum --check ./*.sha256
           ls -l
 
+      - name: Generate Arch Linux PKGBUILD
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          base="https://github.com/${{ github.repository }}/releases/download/v${version}"
+          tar_x86="suno-downloader-${version}-x86_64-unknown-linux-musl.tar.gz"
+          tar_arm="suno-downloader-${version}-aarch64-unknown-linux-musl.tar.gz"
+          sum_x86=$(sha256sum "dist/$tar_x86" | cut -d' ' -f1)
+          sum_arm=$(sha256sum "dist/$tar_arm" | cut -d' ' -f1)
+
+          # A binary PKGBUILD: no compiling, just the released static tarball.
+          # `\$` keeps makepkg's own variables out of shell expansion.
+          cat > dist/PKGBUILD <<EOF
+          # Maintainer: $PACKAGE_MAINTAINER
+          pkgname=suno-downloader-bin
+          pkgver=${version}
+          pkgrel=1
+          pkgdesc="Download a Suno song as an MP3"
+          arch=('x86_64' 'aarch64')
+          url="https://github.com/${{ github.repository }}"
+          license=('unknown')
+          depends=('ffmpeg')
+          provides=('suno-downloader')
+          conflicts=('suno-downloader')
+          options=(!strip !debug)
+          source_x86_64=("${tar_x86}::${base}/${tar_x86}")
+          sha256sums_x86_64=('${sum_x86}')
+          source_aarch64=("${tar_arm}::${base}/${tar_arm}")
+          sha256sums_aarch64=('${sum_arm}')
+
+          package() {
+            local dir="\$srcdir/suno-downloader-\$pkgver-\${CARCH}-unknown-linux-musl"
+            install -Dm755 "\$dir/suno-downloader" "\$pkgdir/usr/bin/suno-downloader"
+            install -Dm644 "\$dir/README.md" \
+              "\$pkgdir/usr/share/doc/suno-downloader/README.md"
+          }
+          EOF
+          bash -n dist/PKGBUILD
+          cat dist/PKGBUILD
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          cat > notes.md <<'EOF'
-          Statically linked Linux binaries (musl, static-pie) — no glibc version
-          requirements, so they run on any distribution.
-
-          - `x86_64-unknown-linux-musl` — most desktops and servers
-          - `aarch64-unknown-linux-musl` — ARM64 machines, Raspberry Pi 4/5 (64-bit)
-
-          Each tarball contains the `suno-downloader` binary and this README.
-
-          Native packages are provided for the major distributions:
-
-          - `suno-downloader_<version>_amd64.deb` / `..._arm64.deb` —
-            Debian, Ubuntu, Mint, Pop!_OS, Kali, Raspberry Pi OS
-          - `suno-downloader-<version>-1.x86_64.rpm` / `...aarch64.rpm` —
-            Fedora, RHEL/Rocky/Alma, CentOS Stream, openSUSE, Amazon Linux
-
-          Verify all downloads with `sha256sum --check <file>.sha256` (tarballs)
-          or `packages-<target>.sha256` (packages).
-
-          Requirements: **ffmpeg** on `PATH` (for MP3 encoding).
-
-          ```bash
-          # Any distribution, from the tarball:
-          tar -xzf suno-downloader-*-x86_64-unknown-linux-musl.tar.gz
-          sudo install suno-downloader-*/suno-downloader /usr/local/bin/
-
-          # or, from a package:
-          sudo apt install ./suno-downloader_*.deb        # Debian/Ubuntu
-          sudo dnf install ./suno-downloader-*.rpm        # Fedora/RHEL
-
-          suno-downloader https://suno.com/song/<id>
-          ```
-          EOF
-
+          # The release carries no description text: just a title and assets.
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+            gh api --method PATCH "repos/$GH_REPO/releases/tags/$GITHUB_REF_NAME" \
+              -f body="" >/dev/null
           else
-            gh release create "$GITHUB_REF_NAME" dist/* \
-              --title "$GITHUB_REF_NAME" \
-              --notes-file notes.md
+            gh api --method POST "repos/$GH_REPO/releases" \
+              -f tag_name="$GITHUB_REF_NAME" \
+              -f name="$GITHUB_REF_NAME" \
+              -f body="" >/dev/null
           fi
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
