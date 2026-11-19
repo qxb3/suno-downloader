@@ -4,6 +4,7 @@
 // @version      1.3.0
 // @description  Replaces Suno's share button with a download button — the userscript port of suno-downloader.
 // @author       suno-downloader
+// @license      MIT
 // @match        https://suno.com/*
 // @match        https://*.suno.com/*
 // @run-at       document-idle
